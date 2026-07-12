@@ -26,20 +26,54 @@
         return formatDate(new Date());
     }
 
-    function requestTmdb(url, params) {
-        return new Promise(function (resolve) {
-            Lampa.Api.sources.tmdb.get(
-                url,
-                params || {},
-                function (data) {
-                    resolve(data || {});
-                },
-                function () {
-                    resolve({});
-                }
-            );
+function requestTmdb(url, params) {
+    return new Promise(function (resolve) {
+        var query = [];
+
+        params = params || {};
+
+        Object.keys(params).forEach(function (key) {
+            if (
+                params[key] !== undefined &&
+                params[key] !== null &&
+                params[key] !== ''
+            ) {
+                query.push(
+                    encodeURIComponent(key) +
+                    '=' +
+                    encodeURIComponent(params[key])
+                );
+            }
         });
-    }
+
+        var fullUrl = url;
+
+        if (query.length) {
+            fullUrl += '?' + query.join('&');
+        }
+
+        console.log('[Russian Catalog] TMDB:', fullUrl);
+
+        Lampa.Api.list(
+            {
+                source: 'tmdb',
+                url: fullUrl
+            },
+            function (data) {
+                resolve(data || {});
+            },
+            function (error) {
+                console.log(
+                    '[Russian Catalog] TMDB request failed:',
+                    fullUrl,
+                    error
+                );
+
+                resolve({});
+            }
+        );
+    });
+}
 
     function requestJson(url) {
         return new Promise(function (resolve) {
@@ -205,22 +239,19 @@
                     ];
 
                     rows = rows.filter(function (row) {
-                        return row.results && row.results.length;
-                    });
+    return row.results && row.results.length;
+});
 
-                    self.build({
-                        results: rows
-                    });
+console.log('[Russian Catalog] Rows:', rows);
 
-                    self.activity.loader(false);
-                    self.activity.toggle();
-                })
-                .catch(function (error) {
-                    console.log('[Russian Catalog] Error:', error);
+if (rows.length) {
+    self.build(rows);
+} else {
+    self.empty();
+}
 
-                    self.activity.loader(false);
-                    self.empty();
-                });
+self.activity.loader(false);
+self.activity.toggle();
 
             return this.render();
         };
