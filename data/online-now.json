@@ -4,15 +4,18 @@
   "items": [
     {
       "title": "Нейровася",
-      "service": "Wink"
+      "service": "Wink",
+      "priority": 100
     },
     {
       "title": "Такси под прикрытием",
-      "service": "Okko"
+      "service": "Okko",
+      "priority": 90
     },
     {
       "title": "Чужой дом",
-      "service": "Онлайн-премьера"
+      "service": "Онлайн-премьера",
+      "priority": 80
     }
   ]
 }
