@@ -9,34 +9,68 @@
     if (window[PLUGIN_NAME + '_ready']) return;
     window[PLUGIN_NAME + '_ready'] = true;
 
-    function loadJson(url, success, error) {
-        var network = new Lampa.Reguest();
+    function loadJson(url) {
+        return new Promise(function (resolve, reject) {
+            var network = new Lampa.Reguest();
 
-        network.timeout(15000);
-
-        network.silent(
-            url + '?v=' + Date.now(),
-            function (data) {
-                success(data || {});
-            },
-            function () {
-                error();
-            }
-        );
+            network.silent(
+                url + '?v=' + Date.now(),
+                function (data) {
+                    resolve(data || {});
+                },
+                function (error) {
+                    reject(error);
+                }
+            );
+        });
     }
 
-    function openStandardCard(item) {
-        /*
-         * Открываем стандартный поиск Lampa.
-         * Первый результат обычно будет нужным сериалом,
-         * а затем открывается обычная карточка Lampa.
-         */
-        Lampa.Activity.push({
-            url: '',
-            title: 'Поиск: ' + item.title,
-            component: 'search',
-            search: item.title,
-            page: 1
+    function searchTmdb(title) {
+        return new Promise(function (resolve) {
+            Lampa.Api.sources.tmdb.get(
+                'search/tv',
+                {
+                    query: title,
+                    language: 'ru-RU',
+                    page: 1
+                },
+                function (data) {
+                    var results = data && data.results
+                        ? data.results
+                        : [];
+
+                    resolve(results[0] || null);
+                },
+                function () {
+                    resolve(null);
+                }
+            );
+        });
+    }
+
+    function loadCards() {
+        return loadJson(DATA_URL).then(function (catalog) {
+            var items = catalog.items || [];
+
+            return Promise.all(
+                items.map(function (entry) {
+                    return searchTmdb(entry.title).then(function (card) {
+                        if (!card) return null;
+
+                        card.media_type = 'tv';
+                        card.title = card.name || entry.title;
+                        card.name = card.name || entry.title;
+                        card.service = entry.service || '';
+                        card.online_service = entry.service || '';
+
+                        return card;
+                    });
+                })
+            );
+        }).then(function (cards) {
+            return cards.filter(function (card) {
+                return card && card.id;
+            });
         });
     }
 
@@ -44,57 +78,68 @@
         var comp = new Lampa.InteractionCategory(object);
 
         comp.create = function () {
-            return comp.render();
-        };
+            var self = this;
 
-        comp.initialize = function () {
-            comp.loading(true);
+            this.activity.loader(true);
 
-            loadJson(
-                DATA_URL,
-                function (catalog) {
-                    var sourceItems = catalog.items || [];
+            loadCards()
+                .then(function (cards) {
+                    console.log(
+                        '[Russian Catalog] loaded cards:',
+                        cards
+                    );
 
-                    if (!sourceItems.length) {
-                        comp.loading(false);
-                        comp.empty('Список пока не заполнен');
+                    if (!cards.length) {
+                        self.empty(
+                            'Не удалось найти сериалы в TMDB'
+                        );
+                        self.activity.loader(false);
                         return;
                     }
 
-                    var cards = sourceItems.map(function (item) {
-                        return {
-                            id: item.id,
-                            tmdb_id: item.id,
-                            title: item.title,
-                            name: item.title,
-                            original_title: item.title,
-                            original_name: item.title,
-                            media_type: 'tv',
-                            service: item.service || '',
-                            subtitle: item.service
-                                ? 'Сейчас на ' + item.service
-                                : 'Сейчас выходит'
-                        };
-                    });
-
-                    comp.loading(false);
-
-                    comp.build({
+                    self.build({
                         results: cards,
-                        collection: true,
-                        total_pages: 1
+                        page: 1,
+                        total_pages: 1,
+                        total_results: cards.length
                     });
-                },
-                function () {
-                    comp.loading(false);
-                    comp.empty('Не удалось загрузить подборку');
-                }
-            );
+
+                    self.activity.loader(false);
+                    self.activity.toggle();
+                })
+                .catch(function (error) {
+                    console.log(
+                        '[Russian Catalog] load error:',
+                        error
+                    );
+
+                    self.empty(
+                        'Не удалось загрузить ручную подборку'
+                    );
+
+                    self.activity.loader(false);
+                });
+
+            return this.render();
         };
 
         comp.cardRender = function (object, element, card) {
+            var originalEnter = card.onEnter;
+
             card.onEnter = function () {
-                openStandardCard(element);
+                if (originalEnter) {
+                    originalEnter();
+                } else {
+                    Lampa.Activity.push({
+                        url: '',
+                        component: 'full',
+                        id: element.id,
+                        method: 'tv',
+                        card: element,
+                        movie: element,
+                        source: 'tmdb'
+                    });
+                }
             };
         };
 
@@ -134,14 +179,19 @@
     }
 
     function startPlugin() {
-        Lampa.Component.add(COMPONENT_NAME, ManualTopComponent);
+        Lampa.Component.add(
+            COMPONENT_NAME,
+            ManualTopComponent
+        );
 
         addMenuButton();
 
         setTimeout(addMenuButton, 1000);
         setTimeout(addMenuButton, 3000);
 
-        console.log('[Russian Catalog] manual top started');
+        console.log(
+            '[Russian Catalog] manual top started'
+        );
     }
 
     if (window.appready) {
