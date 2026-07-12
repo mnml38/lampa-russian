@@ -48,9 +48,60 @@
         });
     }
 
-    function loadCards() {
-        return loadJson(DATA_URL).then(function (catalog) {
+function loadCards() {
+    return loadJson(DATA_URL)
+        .then(function (catalog) {
             var items = catalog.items || [];
+
+            items.sort(function (a, b) {
+                return (b.priority || 0) - (a.priority || 0);
+            });
+
+            return Promise.all(
+                items.map(function (entry) {
+                    return searchTmdb(entry.title).then(function (card) {
+                        if (!card) return null;
+
+                        card.media_type = 'tv';
+                        card.method = 'tv';
+                        card.source = 'tmdb';
+
+                        card.title = card.name || entry.title;
+                        card.name = card.name || entry.title;
+
+                        card.original_title =
+                            card.original_name ||
+                            card.name ||
+                            entry.title;
+
+                        card.original_name =
+                            card.original_name ||
+                            card.name ||
+                            entry.title;
+
+                        card.online_service = entry.service || '';
+                        card.service = entry.service || '';
+                        card.priority = entry.priority || 0;
+
+                        /*
+                         * Подзаголовок может отображаться не во всех
+                         * версиях и темах Lampa, но данные сохраняем.
+                         */
+                        card.subtitle = entry.service
+                            ? 'Сейчас на ' + entry.service
+                            : 'Сейчас выходит';
+
+                        return card;
+                    });
+                })
+            );
+        })
+        .then(function (cards) {
+            return cards.filter(function (card) {
+                return card && card.id;
+            });
+        });
+}
 
             return Promise.all(
                 items.map(function (entry) {
