@@ -16,15 +16,31 @@
         });
     }
 
-    function openCatalog() {
-        openCategory(
-            'Российские сериалы',
-            'discover/tv' +
-                '?with_origin_country=RU' +
-                '&with_original_language=ru' +
-                '&sort_by=popularity.desc'
-        );
-    }
+   function formatDate(date) {
+    var year = date.getFullYear();
+    var month = String(date.getMonth() + 1).padStart(2, '0');
+    var day = String(date.getDate()).padStart(2, '0');
+
+    return year + '-' + month + '-' + day;
+}
+
+function openCatalog() {
+    var now = new Date();
+    var from = new Date();
+
+    from.setDate(now.getDate() - 60);
+
+    var url =
+        'discover/tv' +
+        '?with_origin_country=RU' +
+        '&with_original_language=ru' +
+        '&air_date.gte=' + formatDate(from) +
+        '&air_date.lte=' + formatDate(now) +
+        '&vote_count.gte=5' +
+        '&sort_by=popularity.desc';
+
+    openCategory('Сейчас выходят', url);
+}
 
     function addMenuButton() {
         if ($('.russian-catalog-menu').length) return;
