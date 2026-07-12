@@ -123,26 +123,6 @@
             return this.render();
         };
 
-        comp.cardRender = function (object, element, card) {
-            var originalEnter = card.onEnter;
-
-            card.onEnter = function () {
-                if (originalEnter) {
-                    originalEnter();
-                } else {
-                    Lampa.Activity.push({
-                        url: '',
-                        component: 'full',
-                        id: element.id,
-                        method: 'tv',
-                        card: element,
-                        movie: element,
-                        source: 'tmdb'
-                    });
-                }
-            };
-        };
-
         return comp;
     }
 
