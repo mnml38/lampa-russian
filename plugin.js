@@ -2,45 +2,112 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
+    var COMPONENT_NAME = 'russian_online_top';
+    var DATA_URL =
+        'https://mnml38.github.io/lampa-russian/data/online-now.json';
 
     if (window[PLUGIN_NAME + '_ready']) return;
     window[PLUGIN_NAME + '_ready'] = true;
 
-    function openCategory(title, url) {
+    function loadJson(url, success, error) {
+        var network = new Lampa.Reguest();
+
+        network.timeout(15000);
+
+        network.silent(
+            url + '?v=' + Date.now(),
+            function (data) {
+                success(data || {});
+            },
+            function () {
+                error();
+            }
+        );
+    }
+
+    function openStandardCard(item) {
+        /*
+         * Открываем стандартный поиск Lampa.
+         * Первый результат обычно будет нужным сериалом,
+         * а затем открывается обычная карточка Lampa.
+         */
         Lampa.Activity.push({
-            title: title,
-            component: 'category_full',
-            source: 'tmdb',
-            url: url,
+            url: '',
+            title: 'Поиск: ' + item.title,
+            component: 'search',
+            search: item.title,
             page: 1
         });
     }
 
-   function formatDate(date) {
-    var year = date.getFullYear();
-    var month = String(date.getMonth() + 1).padStart(2, '0');
-    var day = String(date.getDate()).padStart(2, '0');
+    function ManualTopComponent(object) {
+        var comp = new Lampa.InteractionCategory(object);
 
-    return year + '-' + month + '-' + day;
-}
+        comp.create = function () {
+            return comp.render();
+        };
 
-function openCatalog() {
-    var now = new Date();
-    var from = new Date();
+        comp.initialize = function () {
+            comp.loading(true);
 
-    from.setDate(now.getDate() - 60);
+            loadJson(
+                DATA_URL,
+                function (catalog) {
+                    var sourceItems = catalog.items || [];
 
-    var url =
-        'discover/tv' +
-        '?with_origin_country=RU' +
-        '&with_original_language=ru' +
-        '&air_date.gte=' + formatDate(from) +
-        '&air_date.lte=' + formatDate(now) +
-        '&vote_count.gte=5' +
-        '&sort_by=popularity.desc';
+                    if (!sourceItems.length) {
+                        comp.loading(false);
+                        comp.empty('Список пока не заполнен');
+                        return;
+                    }
 
-    openCategory('Сейчас выходят', url);
-}
+                    var cards = sourceItems.map(function (item) {
+                        return {
+                            id: item.id,
+                            tmdb_id: item.id,
+                            title: item.title,
+                            name: item.title,
+                            original_title: item.title,
+                            original_name: item.title,
+                            media_type: 'tv',
+                            service: item.service || '',
+                            subtitle: item.service
+                                ? 'Сейчас на ' + item.service
+                                : 'Сейчас выходит'
+                        };
+                    });
+
+                    comp.loading(false);
+
+                    comp.build({
+                        results: cards,
+                        collection: true,
+                        total_pages: 1
+                    });
+                },
+                function () {
+                    comp.loading(false);
+                    comp.empty('Не удалось загрузить подборку');
+                }
+            );
+        };
+
+        comp.cardRender = function (object, element, card) {
+            card.onEnter = function () {
+                openStandardCard(element);
+            };
+        };
+
+        return comp;
+    }
+
+    function openCatalog() {
+        Lampa.Activity.push({
+            title: 'Сейчас в онлайн-кинотеатрах',
+            component: COMPONENT_NAME,
+            page: 1
+        });
+    }
 
     function addMenuButton() {
         if ($('.russian-catalog-menu').length) return;
@@ -67,12 +134,14 @@ function openCatalog() {
     }
 
     function startPlugin() {
+        Lampa.Component.add(COMPONENT_NAME, ManualTopComponent);
+
         addMenuButton();
 
         setTimeout(addMenuButton, 1000);
         setTimeout(addMenuButton, 3000);
 
-        console.log('[Russian Catalog] started');
+        console.log('[Russian Catalog] manual top started');
     }
 
     if (window.appready) {
