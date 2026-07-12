@@ -139,13 +139,226 @@ card.original_name =
         return comp;
     }
 
-    function openCatalog() {
-        Lampa.Activity.push({
-            title: 'Сейчас в онлайн-кинотеатрах',
-            component: COMPONENT_NAME,
-            page: 1
-        });
+    function openManualTop() {
+    Lampa.Activity.push({
+        title: 'Сейчас в онлайн-кинотеатрах',
+        component: COMPONENT_NAME,
+        page: 1
+    });
+}
+
+function openTmdbCategory(title, url) {
+    Lampa.Activity.push({
+        title: title,
+        component: 'category_full',
+        source: 'tmdb',
+        url: url,
+        page: 1
+    });
+}
+
+function openNewSeries() {
+    var now = new Date();
+    var from = new Date();
+
+    from.setDate(now.getDate() - 90);
+
+    function dateString(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+
+        return year + '-' + month + '-' + day;
     }
+
+    openTmdbCategory(
+        'Новые российские сериалы',
+        'discover/tv' +
+            '?with_origin_country=RU' +
+            '&with_original_language=ru' +
+            '&air_date.gte=' + dateString(from) +
+            '&air_date.lte=' + dateString(now) +
+            '&sort_by=popularity.desc'
+    );
+}
+
+function openNewMovies() {
+    var now = new Date();
+    var from = new Date();
+
+    from.setFullYear(now.getFullYear() - 1);
+
+    function dateString(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+
+        return year + '-' + month + '-' + day;
+    }
+
+    openTmdbCategory(
+        'Новые российские фильмы',
+        'discover/movie' +
+            '?with_origin_country=RU' +
+            '&with_original_language=ru' +
+            '&primary_release_date.gte=' + dateString(from) +
+            '&primary_release_date.lte=' + dateString(now) +
+            '&sort_by=primary_release_date.desc'
+    );
+}
+
+function openPopularSeries() {
+    openTmdbCategory(
+        'Популярные российские сериалы',
+        'discover/tv' +
+            '?with_origin_country=RU' +
+            '&with_original_language=ru' +
+            '&vote_count.gte=20' +
+            '&sort_by=popularity.desc'
+    );
+}
+
+function openPopularMovies() {
+    openTmdbCategory(
+        'Популярные российские фильмы',
+        'discover/movie' +
+            '?with_origin_country=RU' +
+            '&with_original_language=ru' +
+            '&vote_count.gte=20' +
+            '&sort_by=popularity.desc'
+    );
+}
+
+function openSovietMovies() {
+    openTmdbCategory(
+        'Советское кино',
+        'discover/movie' +
+            '?with_origin_country=SU' +
+            '&primary_release_date.gte=1922-01-01' +
+            '&primary_release_date.lte=1991-12-31' +
+            '&sort_by=vote_average.desc' +
+            '&vote_count.gte=10'
+    );
+}
+
+function RussianSections(object) {
+    var scroll = new Lampa.Scroll({
+        mask: true,
+        over: true,
+        step: 250
+    });
+
+    var html = $('<div class="russian-sections"></div>');
+
+    var sections = [
+        {
+            title: '🔥 Сейчас в онлайн-кинотеатрах',
+            action: openManualTop
+        },
+        {
+            title: '📺 Новые сериалы',
+            action: openNewSeries
+        },
+        {
+            title: '🎬 Новые фильмы',
+            action: openNewMovies
+        },
+        {
+            title: '⭐ Популярные сериалы',
+            action: openPopularSeries
+        },
+        {
+            title: '⭐ Популярные фильмы',
+            action: openPopularMovies
+        },
+        {
+            title: 'Советское кино',
+            action: openSovietMovies
+        }
+    ];
+
+    sections.forEach(function (section) {
+        var item = $(
+            '<div class="settings-param selector russian-section">' +
+                '<div class="settings-param__name">' +
+                    section.title +
+                '</div>' +
+                '<div class="settings-param__value">›</div>' +
+            '</div>'
+        );
+
+        item.on('hover:enter', section.action);
+        html.append(item);
+    });
+
+    this.create = function () {
+        scroll.render().append(html);
+
+        setTimeout(function () {
+            Lampa.Controller.add('content', {
+                toggle: function () {
+                    Lampa.Controller.collectionSet(
+                        scroll.render().find('.selector')
+                    );
+
+                    Lampa.Controller.collectionFocus(
+                        false,
+                        scroll.render()
+                    );
+                },
+
+                up: function () {
+                    Navigator.move('up');
+                },
+
+                down: function () {
+                    Navigator.move('down');
+                },
+
+                right: function () {
+                    Navigator.move('right');
+                },
+
+                left: function () {
+                    Navigator.move('left');
+                },
+
+                back: function () {
+                    Lampa.Activity.backward();
+                }
+            });
+
+            Lampa.Controller.toggle('content');
+        }, 100);
+
+        return this.render();
+    };
+
+    this.render = function () {
+        return scroll.render();
+    };
+
+    this.start = function () {
+        Lampa.Controller.toggle('content');
+    };
+
+    this.pause = function () {};
+
+    this.stop = function () {};
+
+    this.destroy = function () {
+        scroll.destroy();
+        html.remove();
+    };
+}
+
+function openCatalog() {
+    Lampa.Activity.push({
+        title: 'Русское кино',
+        component: 'russian_sections',
+        page: 1
+    });
+}
 
     function addMenuButton() {
         if ($('.russian-catalog-menu').length) return;
@@ -172,12 +385,17 @@ card.original_name =
     }
 
     function startPlugin() {
-        Lampa.Component.add(
-            COMPONENT_NAME,
-            ManualTopComponent
-        );
+    Lampa.Component.add(
+        COMPONENT_NAME,
+        ManualTopComponent
+    );
 
-        addMenuButton();
+    Lampa.Component.add(
+        'russian_sections',
+        RussianSections
+    );
+
+    addMenuButton();
 
         setTimeout(addMenuButton, 1000);
         setTimeout(addMenuButton, 3000);
@@ -195,5 +413,40 @@ card.original_name =
                 startPlugin();
             }
         });
+
     }
+    Lampa.Template.add(
+    'russian_catalog_style',
+    '<style>' +
+        '.russian-sections{' +
+            'padding:1.5em;' +
+            'max-width:60em;' +
+        '}' +
+
+        '.russian-section{' +
+            'display:flex;' +
+            'align-items:center;' +
+            'justify-content:space-between;' +
+            'padding:1.1em 1.3em;' +
+            'margin-bottom:.7em;' +
+            'border-radius:.6em;' +
+            'background:rgba(255,255,255,.08);' +
+            'font-size:1.25em;' +
+        '}' +
+
+        '.russian-section.focus{' +
+            'background:#fff;' +
+            'color:#000;' +
+        '}' +
+
+        '.russian-section .settings-param__value{' +
+            'font-size:1.5em;' +
+            'opacity:.65;' +
+        '}' +
+    '</style>'
+);
+
+$('body').append(
+    Lampa.Template.get('russian_catalog_style', {})
+);
 })();
