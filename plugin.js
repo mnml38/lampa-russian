@@ -58,8 +58,21 @@
                         if (!card) return null;
 
                         card.media_type = 'tv';
-                        card.title = card.name || entry.title;
-                        card.name = card.name || entry.title;
+card.method = 'tv';
+card.source = 'tmdb';
+
+card.title = card.name || entry.title;
+card.name = card.name || entry.title;
+
+card.original_title =
+    card.original_name ||
+    card.name ||
+    entry.title;
+
+card.original_name =
+    card.original_name ||
+    card.name ||
+    entry.title;
                         card.service = entry.service || '';
                         card.online_service = entry.service || '';
 
