@@ -228,8 +228,12 @@
         return component;
     }
 
-   function openCatalog() {
-    Lampa.Noty.show('Русское кино открылось');
+function openCatalog() {
+    Lampa.Activity.push({
+        title: 'Русское кино',
+        component: PLUGIN_NAME,
+        page: 1
+    });
 }
 
     function addMenuButton() {
