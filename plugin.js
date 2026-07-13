@@ -166,132 +166,173 @@
      * может называться по-разному, поэтому здесь несколько
      * способов запуска.
      */
-    function openTorrent(item) {
-        var torrentUrl = item.torrent;
+function openTorrent(item) {
+    var torrentUrl = item.torrent;
+    var server = 'http://185.139.68.151:8090';
 
-        if (!torrentUrl) {
-            showMessage('У карточки не указана ссылка на торрент');
-            return;
-        }
-
-        /*
-         * Основной вариант для Lampa:
-         * передаём торрент штатному компоненту.
-         */
-        try {
-            if (
-                Lampa.Component &&
-                typeof Lampa.Component.get === 'function' &&
-                Lampa.Component.get('torrent')
-            ) {
-                Lampa.Activity.push({
-                    url: torrentUrl,
-                    title: item.title,
-                    component: 'torrent',
-                    torrent: torrentUrl,
-                    movie: {
-                        title: item.title,
-                        original_title: item.original_title || item.title,
-                        release_date: item.year
-                            ? String(item.year) + '-01-01'
-                            : '',
-                        poster_path: item.poster || '',
-                        overview: item.description || ''
-                    },
-                    page: 1
-                });
-
-                return;
-            }
-        } catch (error) {
-            console.log('[Русское кино] torrent component:', error);
-        }
-
-        /*
-         * Вариант для сборок, где компонент называется torrents.
-         */
-        try {
-            if (
-                Lampa.Component &&
-                typeof Lampa.Component.get === 'function' &&
-                Lampa.Component.get('torrents')
-            ) {
-                Lampa.Activity.push({
-                    url: torrentUrl,
-                    title: item.title,
-                    component: 'torrents',
-                    torrent: torrentUrl,
-                    movie: {
-                        title: item.title,
-                        original_title: item.original_title || item.title,
-                        release_date: item.year
-                            ? String(item.year) + '-01-01'
-                            : '',
-                        poster_path: item.poster || '',
-                        overview: item.description || ''
-                    },
-                    page: 1
-                });
-
-                return;
-            }
-        } catch (error) {
-            console.log('[Русское кино] torrents component:', error);
-        }
-
-        /*
-         * Некоторые сборки предоставляют отдельный объект Torrent.
-         */
-        try {
-            if (Lampa.Torrent) {
-                if (typeof Lampa.Torrent.open === 'function') {
-                    Lampa.Torrent.open({
-                        url: torrentUrl,
-                        title: item.title
-                    });
-
-                    return;
-                }
-
-                if (typeof Lampa.Torrent.add === 'function') {
-                    Lampa.Torrent.add({
-                        url: torrentUrl,
-                        title: item.title
-                    });
-
-                    return;
-                }
-
-                if (typeof Lampa.Torrent.start === 'function') {
-                    Lampa.Torrent.start(torrentUrl, item.title);
-
-                    return;
-                }
-            }
-        } catch (error) {
-            console.log('[Русское кино] Lampa.Torrent:', error);
-        }
-
-        /*
-         * Последний вариант — открыть ссылку как внешний адрес.
-         */
-        try {
-            if (Lampa.Utils && typeof Lampa.Utils.openLink === 'function') {
-                Lampa.Utils.openLink(torrentUrl);
-                return;
-            }
-        } catch (error) {
-            console.log('[Русское кино] openLink:', error);
-        }
-
-        showMessage(
-            'Не удалось открыть торрент. Проверь TorrServer в настройках Lampa'
-        );
+    if (!torrentUrl) {
+        Lampa.Noty.show('Не указана ссылка на торрент');
+        return;
     }
 
-    /*
-     * Компонент со списком разделов.
-     */
+    server = server.replace(/\/+$/, '');
+
+    Lampa.Noty.show('Загружаю список серий');
+
+    fetch(server + '/torrents', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            action: 'add',
+            link: torrentUrl,
+            save_to_db: true
+        })
+    })
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error('TorrServer HTTP ' + response.status);
+            }
+
+            return response.json();
+        })
+        .then(function (torrent) {
+            var files =
+                torrent.file_stats ||
+                torrent.files ||
+                [];
+
+            files = files.filter(function (file) {
+                var name = file.path || file.name || '';
+
+                return /\.(mkv|mp4|avi|mov|m4v|ts|m2ts)$/i.test(name);
+            });
+
+            if (!files.length) {
+                throw new Error('В торренте не найдены видеофайлы');
+            }
+
+            files.sort(function (a, b) {
+                var nameA = a.path || a.name || '';
+                var nameB = b.path || b.name || '';
+
+                return nameA.localeCompare(nameB, undefined, {
+                    numeric: true,
+                    sensitivity: 'base'
+                });
+            });
+
+            var selectItems = files.map(function (file, position) {
+                var fileName = file.path || file.name || ('Серия ' + (position + 1));
+
+                return {
+                    title: cleanEpisodeName(fileName, position),
+                    subtitle: formatFileSize(file.length || file.size || 0),
+                    file: file,
+                    position: position
+                };
+            });
+
+            Lampa.Select.show({
+                title: item.title + ' — выбрать серию',
+                items: selectItems,
+                onSelect: function (selected) {
+                    playTorrentFile(
+                        server,
+                        torrent,
+                        selected.file,
+                        selected.position,
+                        item
+                    );
+                },
+                onBack: function () {
+                    Lampa.Controller.toggle('content');
+                }
+            });
+        })
+        .catch(function (error) {
+            console.error('[Русское кино]', error);
+
+            Lampa.Noty.show(
+                'Ошибка: ' + error.message
+            );
+        });
+}
+function cleanEpisodeName(fileName, position) {
+    var name = fileName.split('/').pop();
+
+    name = name.replace(/\.(mkv|mp4|avi|mov|m4v|ts|m2ts)$/i, '');
+
+    var episode =
+        name.match(/(?:s\d{1,2}[\s._-]*)?e(\d{1,3})/i) ||
+        name.match(/(?:серия|series?)[\s._-]*(\d{1,3})/i);
+
+    if (episode) {
+        return 'Серия ' + parseInt(episode[1], 10);
+    }
+
+    return 'Серия ' + (position + 1);
+}
+
+function formatFileSize(bytes) {
+    bytes = Number(bytes || 0);
+
+    if (!bytes) return '';
+
+    var gigabytes = bytes / 1024 / 1024 / 1024;
+
+    if (gigabytes >= 1) {
+        return gigabytes.toFixed(2) + ' ГБ';
+    }
+
+    return (bytes / 1024 / 1024).toFixed(0) + ' МБ';
+}
+
+function playTorrentFile(server, torrent, file, position, item) {
+    var hash = torrent.hash;
+    var fileName = file.path || file.name || '';
+    var fileIndex =
+        file.id !== undefined
+            ? file.id
+            : file.index !== undefined
+                ? file.index
+                : position;
+
+    if (!hash) {
+        Lampa.Noty.show('TorrServer не вернул хеш торрента');
+        return;
+    }
+
+    var streamUrl =
+        server +
+        '/stream/' +
+        encodeURIComponent(fileName.split('/').pop()) +
+        '?link=' +
+        encodeURIComponent(hash) +
+        '&index=' +
+        encodeURIComponent(fileIndex) +
+        '&play';
+
+    console.log('[Русское кино] Запуск:', streamUrl);
+
+    Lampa.Player.play({
+        url: streamUrl,
+        title: item.title + ' — серия ' + (position + 1),
+        movie: {
+            title: item.title,
+            original_title: item.original_title || item.title,
+            overview: item.description || '',
+            release_date: item.year
+                ? String(item.year) + '-01-01'
+                : ''
+        }
+    });
+
+    Lampa.Player.playlist(
+        []
+    );
+}
     function RussianSectionsComponent(object) {
         var scroll = new Lampa.Scroll({
             mask: true,
