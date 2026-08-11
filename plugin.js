@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.0.0';
+    var VERSION = '1.1.0';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -11,13 +11,22 @@
     var ONLINE_DATA_URL =
         'https://mnml38.github.io/lampa-russian/data/online-now.json';
 
+    var TORRENTS_DATA_URL =
+        'https://mnml38.github.io/lampa-russian/data/my-torrents.json';
+
+    /*
+     * Адрес TorrServer можно заменить здесь или переопределить
+     * через Lampa.Storage с ключом russian_torrent_server.
+     */
+    var DEFAULT_TORRENT_SERVER = 'http://185.139.68.151:8090';
+
     /*
      * ВАЖНО:
      * Файл должен находиться в репозитории по адресу:
      *
      * torrents/chikatilo.torrent
      */
-    var MY_TORRENTS = [
+    var MY_TORRENTS_FALLBACK = [
         {
             title: 'След Чикатило',
             original_title: 'След Чикатило',
@@ -159,6 +168,110 @@
         showMessage('Раздел «Советское кино» скоро будет добавлен');
     }
 
+    function getTorrentServer() {
+        var server = DEFAULT_TORRENT_SERVER;
+
+        try {
+            if (Lampa.Storage && Lampa.Storage.get) {
+                server = Lampa.Storage.get(
+                    'russian_torrent_server',
+                    DEFAULT_TORRENT_SERVER
+                );
+            }
+        } catch (error) {
+            console.warn('[Русское кино] Не удалось прочитать адрес TorrServer', error);
+        }
+
+        return String(server || DEFAULT_TORRENT_SERVER).replace(/\/+$/, '');
+    }
+
+    function getTorrentSources(item) {
+        var sources = [];
+
+        if (Array.isArray(item.torrents)) {
+            sources = item.torrents.map(function (source, index) {
+                if (typeof source === 'string') {
+                    return {
+                        title: 'Сезон ' + (index + 1),
+                        link: source
+                    };
+                }
+
+                return {
+                    title: source.title || source.name || ('Сезон ' + (index + 1)),
+                    link: source.link || source.torrent || source.url
+                };
+            });
+        }
+
+        if (item.torrent) {
+            sources.unshift({
+                title: item.torrent_title || 'Торрент',
+                link: item.torrent
+            });
+        }
+
+        return sources.filter(function (source) {
+            return source.link;
+        });
+    }
+
+    function openTorrentSource(item, source) {
+        openTorrent(item, source && source.link);
+    }
+
+    function chooseTorrentSource(item) {
+        var sources = getTorrentSources(item);
+
+        if (!sources.length) {
+            showMessage('Для этого сериала не указана торрент-ссылка');
+            return;
+        }
+
+        if (sources.length === 1) {
+            openTorrentSource(item, sources[0]);
+            return;
+        }
+
+        Lampa.Select.show({
+            title: item.title + ' — выбрать сезон',
+            items: sources.map(function (source) {
+                return { title: source.title, source: source };
+            }),
+            onSelect: function (selected) {
+                openTorrentSource(item, selected.source);
+            },
+            onBack: function () {
+                Lampa.Controller.toggle('content');
+            }
+        });
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function parseTorrentsData(data) {
+        if (typeof data === 'string') {
+            try {
+                data = JSON.parse(data);
+            } catch (error) {
+                return [];
+            }
+        }
+
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.items)) return data.items;
+        if (data && Array.isArray(data.torrents)) return data.torrents;
+
+        return [];
+    }
+
     /*
      * Открытие собственного torrent-файла.
      *
@@ -166,16 +279,13 @@
      * может называться по-разному, поэтому здесь несколько
      * способов запуска.
      */
-function openTorrent(item) {
-    var torrentUrl = item.torrent;
-    var server = 'http://185.139.68.151:8090';
+    function openTorrent(item, torrentUrl) {
+    var server = getTorrentServer();
 
     if (!torrentUrl) {
         Lampa.Noty.show('Не указана ссылка на торрент');
         return;
     }
-
-    server = server.replace(/\/+$/, '');
 
     Lampa.Noty.show('Загружаю список серий');
 
@@ -478,6 +588,8 @@ function playTorrentFile(server, torrent, file, position, item) {
      * Компонент «Мои торренты».
      */
     function MyTorrentsComponent(object) {
+        var network = new Lampa.Reguest();
+
         var scroll = new Lampa.Scroll({
             mask: true,
             over: true
@@ -494,32 +606,79 @@ function playTorrentFile(server, torrent, file, position, item) {
 
         var list = html.find('.russian-catalog-list');
 
-        this.create = function () {
-            MY_TORRENTS.forEach(function (item) {
+        function renderItems(items) {
+            list.empty();
+
+            if (!items.length) {
+                list.append(
+                    '<div class="russian-catalog-row">' +
+                        'Добавьте сериалы в data/my-torrents.json' +
+                    '</div>'
+                );
+                return;
+            }
+
+            items.forEach(function (item) {
+                var title = escapeHtml(item.title || 'Без названия');
+                var meta = [
+                    item.description,
+                    item.quality,
+                    item.year
+                ].filter(Boolean).map(escapeHtml).join(' · ');
+                var sourcesCount = getTorrentSources(item).length;
+
+                if (sourcesCount > 1) {
+                    meta = (meta ? meta + ' · ' : '') + sourcesCount + ' сезона';
+                }
+
                 var row = $(
                     '<div class="russian-catalog-row selector">' +
                         '<div class="russian-catalog-row__icon">▶</div>' +
                         '<div>' +
                             '<div class="russian-catalog-row__name">' +
-                                item.title +
+                                title +
                             '</div>' +
                             '<div class="russian-torrent-card__quality">' +
-                                item.description +
-                                ' · ' +
-                                item.quality +
+                                meta +
                             '</div>' +
                         '</div>' +
                     '</div>'
                 );
 
                 row.on('hover:enter', function () {
-                    openTorrent(item);
+                    chooseTorrentSource(item);
                 });
 
                 list.append(row);
             });
+        }
 
+        this.create = function () {
             scroll.append(html);
+
+            if (this.activity && this.activity.loader) {
+                this.activity.loader(true);
+            }
+
+            network.silent(
+                TORRENTS_DATA_URL + '?v=' + Date.now(),
+                function (data) {
+                    if (this.activity && this.activity.loader) {
+                        this.activity.loader(false);
+                    }
+
+                    var items = parseTorrentsData(data);
+                    renderItems(items.length ? items : MY_TORRENTS_FALLBACK);
+                }.bind(this),
+                function () {
+                    if (this.activity && this.activity.loader) {
+                        this.activity.loader(false);
+                    }
+
+                    renderItems(MY_TORRENTS_FALLBACK);
+                    showMessage('Не удалось загрузить data/my-torrents.json');
+                }.bind(this)
+            );
         };
 
         this.start = function () {
@@ -580,6 +739,7 @@ function playTorrentFile(server, torrent, file, position, item) {
         };
 
         this.destroy = function () {
+            network.clear();
             scroll.destroy();
             html.remove();
         };
