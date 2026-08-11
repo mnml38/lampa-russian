@@ -2,11 +2,14 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.1.0';
+    var VERSION = '1.3.0';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
     var MY_TORRENTS_COMPONENT = 'russian_my_torrents';
+    var TORRENT_SETTINGS_KEY = 'russian_torrent_server';
+    var TORRENT_USERNAME_KEY = 'russian_torrent_username';
+    var TORRENT_PASSWORD_KEY = 'russian_torrent_password';
 
     var ONLINE_DATA_URL =
         'https://mnml38.github.io/lampa-russian/data/online-now.json';
@@ -174,7 +177,7 @@
         try {
             if (Lampa.Storage && Lampa.Storage.get) {
                 server = Lampa.Storage.get(
-                    'russian_torrent_server',
+                    TORRENT_SETTINGS_KEY,
                     DEFAULT_TORRENT_SERVER
                 );
             }
@@ -183,6 +186,106 @@
         }
 
         return String(server || DEFAULT_TORRENT_SERVER).replace(/\/+$/, '');
+    }
+
+    function getTorrentCredentials() {
+        var credentials = { username: '', password: '' };
+
+        try {
+            if (Lampa.Storage && Lampa.Storage.get) {
+                credentials.username = String(
+                    Lampa.Storage.get(TORRENT_USERNAME_KEY, '') || ''
+                );
+                credentials.password = String(
+                    Lampa.Storage.get(TORRENT_PASSWORD_KEY, '') || ''
+                );
+            }
+        } catch (error) {
+            console.warn('[Русское кино] Не удалось прочитать данные TorrServer', error);
+        }
+
+        return credentials;
+    }
+
+    function getTorrentHeaders() {
+        var headers = { 'Content-Type': 'application/json' };
+        var credentials = getTorrentCredentials();
+
+        if (credentials.username || credentials.password) {
+            headers.Authorization = 'Basic ' + btoa(
+                credentials.username + ':' + credentials.password
+            );
+        }
+
+        return headers;
+    }
+
+    function getStreamServer() {
+        var server = getTorrentServer();
+        var credentials = getTorrentCredentials();
+
+        if (!credentials.username && !credentials.password) {
+            return server;
+        }
+
+        return server.replace(
+            /^(https?:\/\/)/i,
+            '$1' + encodeURIComponent(credentials.username) + ':' +
+                encodeURIComponent(credentials.password) + '@'
+        );
+    }
+
+    function editTorrentSetting(params, callback) {
+        if (!Lampa.Input || !Lampa.Input.edit) {
+            showMessage('В этой версии Lampa нет окна настройки');
+            return;
+        }
+
+        Lampa.Input.edit({
+            title: params.title,
+            value: params.value || '',
+            free: true,
+            nosave: true,
+            nomic: true,
+            password: Boolean(params.password)
+        }, callback);
+    }
+
+    function configureTorrentServer() {
+        var credentials = getTorrentCredentials();
+
+        editTorrentSetting({
+            title: 'Адрес TorrServer',
+            value: getTorrentServer()
+        }, function (server) {
+            if (Lampa.Storage && Lampa.Storage.set && server) {
+                Lampa.Storage.set(
+                    TORRENT_SETTINGS_KEY,
+                    String(server).replace(/\/+$/, '')
+                );
+            }
+
+            editTorrentSetting({
+                title: 'Логин TorrServer (если нужен)',
+                value: credentials.username
+            }, function (username) {
+                if (Lampa.Storage && Lampa.Storage.set) {
+                    Lampa.Storage.set(TORRENT_USERNAME_KEY, username || '');
+                }
+
+                editTorrentSetting({
+                    title: 'Пароль TorrServer (если нужен)',
+                    value: credentials.password,
+                    password: true
+                }, function (password) {
+                    if (Lampa.Storage && Lampa.Storage.set) {
+                        Lampa.Storage.set(TORRENT_PASSWORD_KEY, password || '');
+                    }
+
+                    showMessage('Настройки TorrServer сохранены');
+                });
+            });
+        });
     }
 
     function getTorrentSources(item) {
@@ -291,9 +394,7 @@
 
     fetch(server + '/torrents', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: getTorrentHeaders(),
         body: JSON.stringify({
             action: 'add',
             link: torrentUrl,
@@ -301,6 +402,12 @@
         })
     })
         .then(function (response) {
+            if (response.status === 401) {
+                throw new Error(
+                    'TorrServer требует авторизацию. Откройте «Настроить TorrServer».'
+                );
+            }
+
             if (!response.ok) {
                 throw new Error('TorrServer HTTP ' + response.status);
             }
@@ -415,7 +522,7 @@ function playTorrentFile(server, torrent, file, position, item) {
     }
 
     var streamUrl =
-        server +
+        getStreamServer() +
         '/stream/' +
         encodeURIComponent(fileName.split('/').pop()) +
         '?link=' +
@@ -424,7 +531,7 @@ function playTorrentFile(server, torrent, file, position, item) {
         encodeURIComponent(fileIndex) +
         '&play';
 
-    console.log('[Русское кино] Запуск:', streamUrl);
+    console.log('[Русское кино] Запуск серии');
 
     Lampa.Player.play({
         url: streamUrl,
@@ -495,6 +602,11 @@ function playTorrentFile(server, torrent, file, position, item) {
                 icon: '🏴',
                 title: 'Мои торренты',
                 action: openMyTorrents
+            },
+            {
+                icon: '⚙️',
+                title: 'Настроить TorrServer',
+                action: configureTorrentServer
             }
         ];
 
@@ -524,14 +636,11 @@ function playTorrentFile(server, torrent, file, position, item) {
         this.start = function () {
             Lampa.Controller.add('content', {
                 toggle: function () {
-                    Lampa.Controller.collectionSet(
-                        scroll.render().find('.selector')
-                    );
+                    var rendered = scroll.render();
+                    var selectors = rendered.find('.selector');
 
-                    Lampa.Controller.collectionFocus(
-                        scroll.render().find('.selector').first(),
-                        scroll.render()
-                    );
+                    Lampa.Controller.collectionSet(rendered);
+                    Lampa.Controller.collectionFocus(selectors.first(), rendered);
                 },
 
                 up: function () {
@@ -684,14 +793,11 @@ function playTorrentFile(server, torrent, file, position, item) {
         this.start = function () {
             Lampa.Controller.add('content', {
                 toggle: function () {
-                    Lampa.Controller.collectionSet(
-                        scroll.render().find('.selector')
-                    );
+                    var rendered = scroll.render();
+                    var selectors = rendered.find('.selector');
 
-                    Lampa.Controller.collectionFocus(
-                        scroll.render().find('.selector').first(),
-                        scroll.render()
-                    );
+                    Lampa.Controller.collectionSet(rendered);
+                    Lampa.Controller.collectionFocus(selectors.first(), rendered);
                 },
 
                 up: function () {
@@ -861,14 +967,11 @@ function playTorrentFile(server, torrent, file, position, item) {
         this.start = function () {
             Lampa.Controller.add('content', {
                 toggle: function () {
-                    Lampa.Controller.collectionSet(
-                        scroll.render().find('.selector')
-                    );
+                    var rendered = scroll.render();
+                    var selectors = rendered.find('.selector');
 
-                    Lampa.Controller.collectionFocus(
-                        scroll.render().find('.selector').first(),
-                        scroll.render()
-                    );
+                    Lampa.Controller.collectionSet(rendered);
+                    Lampa.Controller.collectionFocus(selectors.first(), rendered);
                 },
 
                 up: function () {
