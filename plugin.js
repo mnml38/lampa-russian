@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.4.2';
+    var VERSION = '1.4.3';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -831,7 +831,7 @@ function playTorrentFile(server, torrent, file, position, item) {
             var successfulRequests = 0;
             var hadRequestError = false;
 
-            if (!Lampa.TMDB || !Lampa.TMDB.api) {
+            if (!Lampa.TMDB || !Lampa.TMDB.api || !Lampa.TMDB.key) {
                 showMessage('В этой версии Lampa недоступен поиск TMDB');
                 return;
             }
@@ -917,12 +917,18 @@ function playTorrentFile(server, torrent, file, position, item) {
 
             function searchTitle(query, withYear, onComplete) {
                 var url = 'search/' + type + '?query=' + encodeURIComponent(query);
+                var language = Lampa.Storage && Lampa.Storage.field
+                    ? Lampa.Storage.field('tmdb_lang')
+                    : 'ru-RU';
 
                 if (withYear && year) {
                     url += type === 'tv'
                         ? '&first_air_date_year=' + year
                         : '&year=' + year;
                 }
+
+                url += '&api_key=' + encodeURIComponent(Lampa.TMDB.key());
+                url += '&language=' + encodeURIComponent(language || 'ru-RU');
 
                 titleSearchNetwork.timeout(15000);
 

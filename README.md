@@ -5,7 +5,7 @@
 ## Подключение
 
 1. Получите личный API-ключ на [kinopoiskapiunofficial.tech](https://kinopoiskapiunofficial.tech/).
-2. Добавьте в Lampa URL плагина: `https://mnml38.github.io/lampa-russian/plugin.js?v=1.4.2`.
+2. Добавьте в Lampa URL плагина: `https://mnml38.github.io/lampa-russian/plugin.js?v=1.4.3`.
 3. Откройте меню **Русское кино** → **Настроить API Кинопоиска** и введите ключ.
 4. Откройте нужную подборку. При выборе фильма плагин ищет совпадение в TMDB по названию и году и открывает штатную карточку Lampa. Если совпадения нет или TMDB недоступен в вашей сборке, плагин покажет сообщение.
 
