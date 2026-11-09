@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.4.1';
+    var VERSION = '1.4.2';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -794,7 +794,7 @@ function playTorrentFile(server, torrent, file, position, item) {
 
     /*
      * Каталог российских фильмов и сериалов из Kinopoisk API Unofficial.
-     * API отдаёт метаданные; просмотр открывается через поиск Lampa.
+     * API отдаёт метаданные; карточку Lampa находим по названию и году в TMDB.
      */
     function KinopoiskCatalogComponent(object) {
         var network = new Lampa.Reguest();
@@ -813,18 +813,170 @@ function playTorrentFile(server, torrent, file, position, item) {
         );
 
         var list = html.find('.russian-catalog-list');
+        var titleSearchNetwork = null;
 
         function openSearch(item) {
             var title = item.nameRu || item.nameEn || item.nameOriginal || 'Фильм';
+            var type = item.type === 'TV_SERIES' ? 'tv' : 'movie';
+            var year = parseInt(item.year, 10) || 0;
+            var titles = [item.nameRu, item.nameEn, item.nameOriginal]
+                .map(function (value) {
+                    return String(value || '').trim();
+                })
+                .filter(function (value, index, values) {
+                    return value && values.indexOf(value) === index;
+                });
+            var matches = [];
+            var titleIndex = 0;
+            var successfulRequests = 0;
+            var hadRequestError = false;
 
-            Lampa.Activity.push({
-                url: 'search/multi?query=' + encodeURIComponent(title),
-                title: 'Поиск в Lampa — ' + title,
-                component: 'category_full',
-                source: 'tmdb',
-                card_type: true,
-                page: 1
-            });
+            if (!Lampa.TMDB || !Lampa.TMDB.api) {
+                showMessage('В этой версии Lampa недоступен поиск TMDB');
+                return;
+            }
+
+            if (!titles.length) titles = [title];
+
+            function normalize(value) {
+                return String(value || '')
+                    .toLowerCase()
+                    .replace(/ё/g, 'е')
+                    .replace(/[^a-zа-я0-9]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            function scoreMatch(result) {
+                var resultTitles = [
+                    result.title,
+                    result.name,
+                    result.original_title,
+                    result.original_name
+                ].map(normalize).filter(Boolean);
+                var score = 0;
+
+                titles.forEach(function (candidate) {
+                    var expected = normalize(candidate);
+
+                    resultTitles.forEach(function (actual) {
+                        if (actual === expected) score = Math.max(score, 100);
+                        else if (actual.indexOf(expected) >= 0 || expected.indexOf(actual) >= 0) {
+                            score = Math.max(score, 60);
+                        }
+                    });
+                });
+
+                var releaseDate = result.release_date || result.first_air_date || '';
+                var resultYear = parseInt(String(releaseDate).slice(0, 4), 10) || 0;
+
+                if (year && resultYear) {
+                    score += resultYear === year
+                        ? 30
+                        : Math.max(-20, 10 - Math.abs(resultYear - year) * 3);
+                }
+
+                score += Math.log(Number(result.vote_count || 0) + 1) / 100;
+
+                return score;
+            }
+
+            function openBestMatch() {
+                if (!matches.length) {
+                    showMessage(successfulRequests
+                        ? 'В TMDB не найдено совпадение для «' + title + '»'
+                        : hadRequestError
+                            ? 'Не удалось выполнить поиск в TMDB. Проверьте источник TMDB в Lampa.'
+                            : 'В TMDB не найдено совпадение для «' + title + '»'
+                    );
+                    return;
+                }
+
+                matches.sort(function (a, b) {
+                    return scoreMatch(b) - scoreMatch(a);
+                });
+
+                var card = matches[0];
+                card.source = 'tmdb';
+                card.type = type;
+                card.media_type = type;
+                card.kinopoisk_id = item.kinopoiskId || item.filmId || '';
+                card.title = card.title || card.name || title;
+                card.original_title = card.original_title || card.original_name || '';
+
+                Lampa.Activity.push({
+                    url: type + '/' + card.id,
+                    title: card.title,
+                    component: 'full',
+                    source: 'tmdb',
+                    method: type,
+                    id: card.id,
+                    card: card
+                });
+            }
+
+            function searchTitle(query, withYear, onComplete) {
+                var url = 'search/' + type + '?query=' + encodeURIComponent(query);
+
+                if (withYear && year) {
+                    url += type === 'tv'
+                        ? '&first_air_date_year=' + year
+                        : '&year=' + year;
+                }
+
+                titleSearchNetwork.timeout(15000);
+
+                try {
+                    titleSearchNetwork.silent(
+                        Lampa.TMDB.api(url),
+                        function (data) {
+                            if (typeof data === 'string') {
+                                try {
+                                    data = JSON.parse(data);
+                                } catch (error) {
+                                    data = {};
+                                }
+                            }
+
+                            successfulRequests++;
+
+                            var results = data && Array.isArray(data.results)
+                                ? data.results
+                                : [];
+
+                            if (!results.length && withYear && year) {
+                                searchTitle(query, false, onComplete);
+                                return;
+                            }
+
+                            matches = matches.concat(results);
+                            onComplete();
+                        },
+                        function () {
+                            hadRequestError = true;
+                            onComplete();
+                        }
+                    );
+                } catch (error) {
+                    hadRequestError = true;
+                    onComplete();
+                }
+            }
+
+            function searchNextTitle() {
+                if (titleIndex >= titles.length) {
+                    openBestMatch();
+                    return;
+                }
+
+                var query = titles[titleIndex++];
+                searchTitle(query, true, searchNextTitle);
+            }
+
+            if (titleSearchNetwork) titleSearchNetwork.clear();
+            titleSearchNetwork = new Lampa.Reguest();
+            showMessage('Ищу карточку в Lampa…');
+            searchNextTitle();
         }
 
         function renderEmpty(message) {
@@ -988,6 +1140,7 @@ function playTorrentFile(server, torrent, file, position, item) {
         };
         this.destroy = function () {
             network.clear();
+            if (titleSearchNetwork) titleSearchNetwork.clear();
             scroll.destroy();
             html.remove();
         };
