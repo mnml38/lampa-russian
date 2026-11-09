@@ -2,19 +2,14 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.4.3';
+    var VERSION = '1.5.0';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
     var MY_TORRENTS_COMPONENT = 'russian_my_torrents';
-    var KINOPOISK_COMPONENT = 'russian_kinopoisk_catalog';
-    var KINOPOISK_API_KEY = 'russian_kinopoisk_api_key';
     var TORRENT_SETTINGS_KEY = 'russian_torrent_server';
     var TORRENT_USERNAME_KEY = 'russian_torrent_username';
     var TORRENT_PASSWORD_KEY = 'russian_torrent_password';
-
-    var KINOPOISK_API_URL =
-        'https://kinopoiskapiunofficial.tech/api/v2.2/films';
 
     var ONLINE_DATA_URL =
         'https://mnml38.github.io/lampa-russian/data/online-now.json';
@@ -170,99 +165,83 @@
         openActivity(MY_TORRENTS_COMPONENT, 'Мои торренты');
     }
 
-    function openKinopoiskCatalog(kind, title, page) {
-        if (!getKinopoiskApiKey()) {
-            showMessage('Сначала укажите API-ключ Кинопоиска');
-            configureKinopoiskApi();
-            return;
+    function formatDate(date) {
+        var month = String(date.getMonth() + 1);
+        var day = String(date.getDate());
+
+        if (month.length < 2) month = '0' + month;
+        if (day.length < 2) day = '0' + day;
+
+        return date.getFullYear() + '-' + month + '-' + day;
+    }
+
+    function dateYearsAgo(years) {
+        var date = new Date();
+        date.setFullYear(date.getFullYear() - years);
+        return formatDate(date);
+    }
+
+    function openTmdbCatalog(url, title) {
+        openActivity('category_full', title, {
+            url: url,
+            source: 'tmdb',
+            card_type: true,
+            page: 1
+        });
+    }
+
+    function openRussianCatalog(kind, title) {
+        var today = formatDate(new Date());
+        var from = dateYearsAgo(2);
+        var url = kind === 'new_series' || kind === 'popular_series'
+            ? 'discover/tv'
+            : 'discover/movie';
+        var query = {
+            with_original_language: 'ru'
+        };
+
+        if (kind === 'new_series') {
+            query.sort_by = 'first_air_date.desc';
+            query['first_air_date.gte'] = from;
+            query['first_air_date.lte'] = today;
+        } else if (kind === 'new_movies') {
+            query.sort_by = 'primary_release_date.desc';
+            query['primary_release_date.gte'] = from;
+            query['primary_release_date.lte'] = today;
+        } else if (kind === 'popular_series' || kind === 'popular_movies') {
+            query.sort_by = 'popularity.desc';
+            query['vote_count.gte'] = 10;
+        } else if (kind === 'soviet_movies') {
+            query.sort_by = 'vote_count.desc';
+            query['primary_release_date.gte'] = '1920-01-01';
+            query['primary_release_date.lte'] = '1991-12-31';
         }
 
-        openActivity(KINOPOISK_COMPONENT, title, {
-            catalog_kind: kind,
-            page: page || 1
-        });
+        var request = url + '?' + Object.keys(query).map(function (key) {
+            return encodeURIComponent(key) + '=' + encodeURIComponent(query[key]);
+        }).join('&');
+
+        openTmdbCatalog(request, title);
     }
 
     function openNewSeries() {
-        openKinopoiskCatalog('new_series', 'Новые российские сериалы');
+        openRussianCatalog('new_series', 'Новые российские сериалы');
     }
 
     function openNewMovies() {
-        openKinopoiskCatalog('new_movies', 'Новые российские фильмы');
+        openRussianCatalog('new_movies', 'Новые российские фильмы');
     }
 
     function openPopularSeries() {
-        openKinopoiskCatalog('popular_series', 'Популярные российские сериалы');
+        openRussianCatalog('popular_series', 'Популярные российские сериалы');
     }
 
     function openPopularMovies() {
-        openKinopoiskCatalog('popular_movies', 'Популярные российские фильмы');
+        openRussianCatalog('popular_movies', 'Популярные российские фильмы');
     }
 
     function openSovietMovies() {
-        openKinopoiskCatalog('soviet_movies', 'Советское кино');
-    }
-
-    function getKinopoiskApiKey() {
-        try {
-            if (Lampa.Storage && Lampa.Storage.get) {
-                return String(Lampa.Storage.get(KINOPOISK_API_KEY, '') || '').trim();
-            }
-        } catch (error) {
-            console.warn('[Русское кино] Не удалось прочитать API-ключ Кинопоиска', error);
-        }
-
-        return '';
-    }
-
-    function configureKinopoiskApi() {
-        editTorrentSetting({
-            title: 'API-ключ Кинопоиска Unofficial',
-            value: getKinopoiskApiKey(),
-            password: true
-        }, function (apiKey) {
-            if (Lampa.Storage && Lampa.Storage.set) {
-                Lampa.Storage.set(KINOPOISK_API_KEY, String(apiKey || '').trim());
-            }
-
-            showMessage(apiKey ? 'API-ключ сохранён на этом устройстве' : 'API-ключ удалён');
-        });
-    }
-
-    function buildKinopoiskUrl(kind, page) {
-        var currentYear = new Date().getFullYear();
-        var query = {
-            countries: 34,
-            type: 'FILM',
-            order: 'RATING',
-            ratingFrom: 1,
-            ratingTo: 10,
-            page: page || 1
-        };
-
-        if (kind === 'new_series' || kind === 'popular_series') {
-            query.type = 'TV_SERIES';
-        }
-
-        if (kind === 'new_series' || kind === 'new_movies') {
-            query.order = 'YEAR';
-            query.yearFrom = currentYear - 1;
-            query.yearTo = currentYear;
-        }
-
-        if (kind === 'soviet_movies') {
-            query.yearFrom = 1920;
-            query.yearTo = 1991;
-        }
-
-        if (kind === 'popular_series' || kind === 'popular_movies') {
-            query.order = 'NUM_VOTE';
-            query.ratingFrom = 6;
-        }
-
-        return KINOPOISK_API_URL + '?' + Object.keys(query).map(function (key) {
-            return encodeURIComponent(key) + '=' + encodeURIComponent(query[key]);
-        }).join('&');
+        openRussianCatalog('soviet_movies', 'Советское кино');
     }
 
     function getTorrentServer() {
@@ -693,11 +672,6 @@ function playTorrentFile(server, torrent, file, position, item) {
                 action: openSovietMovies
             },
             {
-                icon: '🔑',
-                title: 'Настроить API Кинопоиска',
-                action: configureKinopoiskApi
-            },
-            {
                 icon: '🏴',
                 title: 'Мои торренты',
                 action: openMyTorrents
@@ -787,366 +761,6 @@ function playTorrentFile(server, torrent, file, position, item) {
         };
 
         this.destroy = function () {
-            scroll.destroy();
-            html.remove();
-        };
-    }
-
-    /*
-     * Каталог российских фильмов и сериалов из Kinopoisk API Unofficial.
-     * API отдаёт метаданные; карточку Lampa находим по названию и году в TMDB.
-     */
-    function KinopoiskCatalogComponent(object) {
-        var network = new Lampa.Reguest();
-        var scroll = new Lampa.Scroll({
-            mask: true,
-            over: true
-        });
-
-        var html = $(
-            '<div class="russian-catalog-section">' +
-                '<div class="russian-catalog-section__title">' +
-                    escapeHtml(object.title || 'Каталог Кинопоиска') +
-                '</div>' +
-                '<div class="russian-catalog-list"></div>' +
-            '</div>'
-        );
-
-        var list = html.find('.russian-catalog-list');
-        var titleSearchNetwork = null;
-
-        function openSearch(item) {
-            var title = item.nameRu || item.nameEn || item.nameOriginal || 'Фильм';
-            var type = item.type === 'TV_SERIES' ? 'tv' : 'movie';
-            var year = parseInt(item.year, 10) || 0;
-            var titles = [item.nameRu, item.nameEn, item.nameOriginal]
-                .map(function (value) {
-                    return String(value || '').trim();
-                })
-                .filter(function (value, index, values) {
-                    return value && values.indexOf(value) === index;
-                });
-            var matches = [];
-            var titleIndex = 0;
-            var successfulRequests = 0;
-            var hadRequestError = false;
-
-            if (!Lampa.TMDB || !Lampa.TMDB.api || !Lampa.TMDB.key) {
-                showMessage('В этой версии Lampa недоступен поиск TMDB');
-                return;
-            }
-
-            if (!titles.length) titles = [title];
-
-            function normalize(value) {
-                return String(value || '')
-                    .toLowerCase()
-                    .replace(/ё/g, 'е')
-                    .replace(/[^a-zа-я0-9]+/g, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-            }
-
-            function scoreMatch(result) {
-                var resultTitles = [
-                    result.title,
-                    result.name,
-                    result.original_title,
-                    result.original_name
-                ].map(normalize).filter(Boolean);
-                var score = 0;
-
-                titles.forEach(function (candidate) {
-                    var expected = normalize(candidate);
-
-                    resultTitles.forEach(function (actual) {
-                        if (actual === expected) score = Math.max(score, 100);
-                        else if (actual.indexOf(expected) >= 0 || expected.indexOf(actual) >= 0) {
-                            score = Math.max(score, 60);
-                        }
-                    });
-                });
-
-                var releaseDate = result.release_date || result.first_air_date || '';
-                var resultYear = parseInt(String(releaseDate).slice(0, 4), 10) || 0;
-
-                if (year && resultYear) {
-                    score += resultYear === year
-                        ? 30
-                        : Math.max(-20, 10 - Math.abs(resultYear - year) * 3);
-                }
-
-                score += Math.log(Number(result.vote_count || 0) + 1) / 100;
-
-                return score;
-            }
-
-            function openBestMatch() {
-                if (!matches.length) {
-                    showMessage(successfulRequests
-                        ? 'В TMDB не найдено совпадение для «' + title + '»'
-                        : hadRequestError
-                            ? 'Не удалось выполнить поиск в TMDB. Проверьте источник TMDB в Lampa.'
-                            : 'В TMDB не найдено совпадение для «' + title + '»'
-                    );
-                    return;
-                }
-
-                matches.sort(function (a, b) {
-                    return scoreMatch(b) - scoreMatch(a);
-                });
-
-                var card = matches[0];
-                card.source = 'tmdb';
-                card.type = type;
-                card.media_type = type;
-                card.kinopoisk_id = item.kinopoiskId || item.filmId || '';
-                card.title = card.title || card.name || title;
-                card.original_title = card.original_title || card.original_name || '';
-
-                Lampa.Activity.push({
-                    url: type + '/' + card.id,
-                    title: card.title,
-                    component: 'full',
-                    source: 'tmdb',
-                    method: type,
-                    id: card.id,
-                    card: card
-                });
-            }
-
-            function searchTitle(query, withYear, onComplete) {
-                var url = 'search/' + type + '?query=' + encodeURIComponent(query);
-                var language = Lampa.Storage && Lampa.Storage.field
-                    ? Lampa.Storage.field('tmdb_lang')
-                    : 'ru-RU';
-
-                if (withYear && year) {
-                    url += type === 'tv'
-                        ? '&first_air_date_year=' + year
-                        : '&year=' + year;
-                }
-
-                url += '&api_key=' + encodeURIComponent(Lampa.TMDB.key());
-                url += '&language=' + encodeURIComponent(language || 'ru-RU');
-
-                titleSearchNetwork.timeout(15000);
-
-                try {
-                    titleSearchNetwork.silent(
-                        Lampa.TMDB.api(url),
-                        function (data) {
-                            if (typeof data === 'string') {
-                                try {
-                                    data = JSON.parse(data);
-                                } catch (error) {
-                                    data = {};
-                                }
-                            }
-
-                            successfulRequests++;
-
-                            var results = data && Array.isArray(data.results)
-                                ? data.results
-                                : [];
-
-                            if (!results.length && withYear && year) {
-                                searchTitle(query, false, onComplete);
-                                return;
-                            }
-
-                            matches = matches.concat(results);
-                            onComplete();
-                        },
-                        function () {
-                            hadRequestError = true;
-                            onComplete();
-                        }
-                    );
-                } catch (error) {
-                    hadRequestError = true;
-                    onComplete();
-                }
-            }
-
-            function searchNextTitle() {
-                if (titleIndex >= titles.length) {
-                    openBestMatch();
-                    return;
-                }
-
-                var query = titles[titleIndex++];
-                searchTitle(query, true, searchNextTitle);
-            }
-
-            if (titleSearchNetwork) titleSearchNetwork.clear();
-            titleSearchNetwork = new Lampa.Reguest();
-            showMessage('Ищу карточку в Lampa…');
-            searchNextTitle();
-        }
-
-        function renderEmpty(message) {
-            list.empty().append(
-                '<div class="russian-catalog-row">' + escapeHtml(message) + '</div>'
-            );
-        }
-
-        function renderItems(items) {
-            list.empty();
-
-            if (!items.length) {
-                renderEmpty('По этому фильтру ничего не найдено');
-                return;
-            }
-
-            items.forEach(function (item) {
-                var title = item.nameRu || item.nameEn || item.nameOriginal || 'Без названия';
-                var type = item.type === 'TV_SERIES' ? 'Сериал' : 'Фильм';
-                var rating = Number(item.ratingKinopoisk || 0);
-                var poster = item.posterUrlPreview || item.posterUrl || '';
-                var meta = [
-                    item.year,
-                    type,
-                    rating ? '★ ' + rating.toFixed(1) : ''
-                ].filter(Boolean).map(escapeHtml).join(' · ');
-                var posterHtml = poster
-                    ? '<img class="russian-catalog-poster" src="' + escapeHtml(poster) + '" alt="">'
-                    : '<div class="russian-catalog-poster"></div>';
-
-                var row = $(
-                    '<div class="russian-catalog-row selector">' +
-                        posterHtml +
-                        '<div class="russian-catalog-item-info">' +
-                            '<div class="russian-catalog-row__name">' +
-                                escapeHtml(title) +
-                            '</div>' +
-                            '<div class="russian-torrent-card__quality">' +
-                                meta +
-                            '</div>' +
-                        '</div>' +
-                    '</div>'
-                );
-
-                row.on('hover:enter', function () {
-                    openSearch(item);
-                });
-
-                list.append(row);
-            });
-
-            var next = $(
-                '<div class="russian-catalog-row selector">' +
-                    '<div class="russian-catalog-row__icon">＋</div>' +
-                    '<div class="russian-catalog-row__name">Ещё результаты</div>' +
-                '</div>'
-            );
-
-            next.on('hover:enter', function () {
-                openKinopoiskCatalog(
-                    object.catalog_kind,
-                    object.title,
-                    Number(object.page || 1) + 1
-                );
-            });
-
-            list.append(next);
-        }
-
-        this.create = function () {
-            scroll.append(html);
-
-            if (this.activity && this.activity.loader) {
-                this.activity.loader(true);
-            }
-
-            network.timeout(15000);
-            network.silent(
-                buildKinopoiskUrl(object.catalog_kind, object.page),
-                function (data) {
-                    if (this.activity && this.activity.loader) {
-                        this.activity.loader(false);
-                    }
-
-                    if (typeof data === 'string') {
-                        try {
-                            data = JSON.parse(data);
-                        } catch (error) {
-                            data = {};
-                        }
-                    }
-
-                    renderItems(
-                        data && Array.isArray(data.items)
-                            ? data.items
-                            : data && Array.isArray(data.films)
-                                ? data.films
-                                : []
-                    );
-                }.bind(this),
-                function (xhr) {
-                    if (this.activity && this.activity.loader) {
-                        this.activity.loader(false);
-                    }
-
-                    var status = Number(xhr && xhr.status || 0);
-                    var message = status === 401 || status === 403
-                        ? 'API-ключ не принят. Проверьте его в настройках плагина.'
-                        : status === 402
-                            ? 'Исчерпан лимит API-ключа.'
-                            : status === 429
-                                ? 'Слишком много запросов. Попробуйте позже.'
-                                : 'Не удалось связаться с API. Проверьте сеть и доступ к сервису.';
-
-                    renderEmpty(message);
-                    showMessage(message);
-                }.bind(this),
-                null,
-                {
-                    headers: {
-                        'X-API-KEY': getKinopoiskApiKey(),
-                        Accept: 'application/json'
-                    }
-                }
-            );
-        };
-
-        this.start = function () {
-            Lampa.Controller.add('content', {
-                toggle: function () {
-                    var rendered = scroll.render();
-                    var selectors = rendered.find('.selector');
-
-                    Lampa.Controller.collectionSet(rendered);
-                    Lampa.Controller.collectionFocus(selectors.first(), rendered);
-                },
-                up: function () {
-                    Lampa.Controller.collectionFocus(false, scroll.render(), 'up');
-                },
-                down: function () {
-                    Lampa.Controller.collectionFocus(false, scroll.render(), 'down');
-                },
-                right: function () {
-                    Lampa.Controller.collectionFocus(false, scroll.render(), 'right');
-                },
-                left: function () {
-                    Lampa.Controller.toggle('menu');
-                },
-                back: function () {
-                    Lampa.Activity.backward();
-                }
-            });
-
-            Lampa.Controller.toggle('content');
-        };
-
-        this.pause = function () {};
-        this.stop = function () {};
-        this.render = function () {
-            return scroll.render();
-        };
-        this.destroy = function () {
-            network.clear();
-            if (titleSearchNetwork) titleSearchNetwork.clear();
             scroll.destroy();
             html.remove();
         };
@@ -1529,10 +1143,6 @@ function playTorrentFile(server, torrent, file, position, item) {
             MyTorrentsComponent
         );
 
-        Lampa.Component.add(
-            KINOPOISK_COMPONENT,
-            KinopoiskCatalogComponent
-        );
     }
 
     function startPlugin() {
