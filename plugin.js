@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.4.0';
+    var VERSION = '1.4.1';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -818,11 +818,11 @@ function playTorrentFile(server, torrent, file, position, item) {
             var title = item.nameRu || item.nameEn || item.nameOriginal || 'Фильм';
 
             Lampa.Activity.push({
-                url: '',
+                url: 'search/multi?query=' + encodeURIComponent(title),
                 title: 'Поиск в Lampa — ' + title,
-                component: 'search',
-                query: title,
-                search: title,
+                component: 'category_full',
+                source: 'tmdb',
+                card_type: true,
                 page: 1
             });
         }
