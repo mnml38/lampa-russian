@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.5.2';
+    var VERSION = '1.6.0';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -92,9 +92,100 @@
             '}' +
 
             '.russian-catalog-list {' +
+            'display:block;' +
+            '}' +
+
+            '.russian-shelf {' +
+            'margin:0 0 1.6em;' +
+            '}' +
+
+            '.russian-shelf__title {' +
+            'font-size:1.35em;' +
+            'font-weight:600;' +
+            'margin:0 0 .65em;' +
+            '}' +
+
+            '.russian-shelf__items {' +
             'display:flex;' +
-            'flex-direction:column;' +
+            'gap:.75em;' +
+            'overflow-x:hidden;' +
+            'padding:.35em .2em .75em;' +
+            '}' +
+
+            '.russian-release-card {' +
+            'position:relative;' +
+            'flex:0 0 8.5em;' +
+            'width:8.5em;' +
+            'min-width:0;' +
+            'transition:transform .18s;' +
+            '}' +
+
+            '.russian-release-card.focus {' +
+            'transform:scale(1.045);' +
+            '}' +
+
+            '.russian-release-card__poster {' +
+            'display:block;' +
+            'width:100%;' +
+            'height:12.4em;' +
+            'object-fit:cover;' +
+            'border-radius:.45em;' +
+            'background:rgba(255,255,255,.1);' +
+            '}' +
+
+            '.russian-release-card.focus .russian-release-card__poster {' +
+            'outline:.18em solid #fff;' +
+            '}' +
+
+            '.russian-release-card__title {' +
+            'font-size:.9em;' +
+            'font-weight:500;' +
+            'line-height:1.25;' +
+            'margin-top:.45em;' +
+            'max-height:2.5em;' +
+            'overflow:hidden;' +
+            '}' +
+
+            '.russian-release-card__meta {' +
+            'font-size:.78em;' +
+            'opacity:.72;' +
+            'margin-top:.25em;' +
+            '}' +
+
+            '.russian-release-card--message {' +
+            'display:flex;' +
+            'align-items:center;' +
+            'justify-content:center;' +
+            'height:12.4em;' +
+            'padding:0 .75em;' +
+            'border-radius:.45em;' +
+            'background:rgba(255,255,255,.08);' +
+            'text-align:center;' +
+            'font-size:.9em;' +
+            '}' +
+
+            '.russian-action-card {' +
+            'display:flex;' +
+            'align-items:center;' +
             'gap:.7em;' +
+            'flex:0 0 15em;' +
+            'padding:1.1em;' +
+            'border-radius:.55em;' +
+            'background:rgba(255,255,255,.08);' +
+            '}' +
+
+            '.russian-action-card.focus {' +
+            'background:#fff;' +
+            'color:#000;' +
+            '}' +
+
+            '.russian-action-card__icon {' +
+            'font-size:1.5em;' +
+            '}' +
+
+            '.russian-action-card__title {' +
+            'font-size:1em;' +
+            'font-weight:500;' +
             '}' +
 
             '.russian-catalog-row {' +
@@ -201,7 +292,7 @@
         });
     }
 
-    function openRussianCatalog(kind, title) {
+    function russianCatalogUrl(kind) {
         var today = formatDate(new Date());
         var from = dateYearsAgo(2);
         var url = kind === 'new_series' || kind === 'popular_series'
@@ -232,7 +323,11 @@
             return encodeURIComponent(key) + '=' + encodeURIComponent(query[key]);
         }).join('&');
 
-        openTmdbCatalog(request, title);
+        return request;
+    }
+
+    function openRussianCatalog(kind, title) {
+        openTmdbCatalog(russianCatalogUrl(kind), title);
     }
 
     function openNewSeries() {
@@ -635,6 +730,8 @@ function playTorrentFile(server, torrent, file, position, item) {
     );
 }
     function RussianSectionsComponent(object) {
+        var requests = [];
+
         var scroll = new Lampa.Scroll({
             mask: true,
             over: true
@@ -651,70 +748,269 @@ function playTorrentFile(server, torrent, file, position, item) {
 
         var list = html.find('.russian-catalog-list');
 
-        var sections = [
+        var shelves = [
             {
-                icon: '🔥',
-                title: 'Сейчас в онлайн-кинотеатрах',
-                action: openOnlineNow
-            },
-            {
-                icon: '📺',
-                title: 'Новые сериалы',
+                kind: 'new_series',
+                type: 'tv',
+                title: 'Новые российские сериалы',
                 action: openNewSeries
             },
             {
-                icon: '🎬',
-                title: 'Новые фильмы',
+                kind: 'new_movies',
+                type: 'movie',
+                title: 'Новые российские фильмы',
                 action: openNewMovies
             },
             {
-                icon: '⭐',
-                title: 'Популярные сериалы',
+                kind: 'popular_series',
+                type: 'tv',
+                title: 'Популярные российские сериалы',
                 action: openPopularSeries
             },
             {
-                icon: '🍿',
-                title: 'Популярные фильмы',
+                kind: 'popular_movies',
+                type: 'movie',
+                title: 'Популярные российские фильмы',
                 action: openPopularMovies
             },
             {
-                icon: '📼',
+                kind: 'soviet_movies',
+                type: 'movie',
                 title: 'Советское кино',
                 action: openSovietMovies
-            },
-            {
-                icon: '🏴',
-                title: 'Мои торренты',
-                action: openMyTorrents
-            },
-            {
-                icon: '⚙️',
-                title: 'Настроить TorrServer',
-                action: configureTorrentServer
             }
         ];
 
-        this.create = function () {
-            sections.forEach(function (section) {
-                var row = $(
-                    '<div class="russian-catalog-row selector">' +
-                        '<div class="russian-catalog-row__icon">' +
-                            section.icon +
-                        '</div>' +
-                        '<div class="russian-catalog-row__name">' +
-                            section.title +
-                        '</div>' +
-                    '</div>'
-                );
+        function isActivePage() {
+            try {
+                var active = Lampa.Activity.active();
+                return active && active.component === SECTIONS_COMPONENT;
+            } catch (error) {
+                return false;
+            }
+        }
 
-                row.on('hover:enter', function () {
-                    section.action();
-                });
+        function syncNavigation(row, restoreFocus) {
+            if (!isActivePage()) return;
 
-                list.append(row);
+            var rendered = scroll.render();
+            Lampa.Controller.collectionSet(rendered);
+
+            if (restoreFocus) {
+                var first = row.find('.selector').first();
+                if (first.length) Lampa.Controller.collectionFocus(first, rendered);
+            }
+        }
+
+        function makeMessageCard(message) {
+            var card = $('<div class="russian-release-card russian-release-card--message selector"></div>');
+            card.text(message);
+            return card;
+        }
+
+        function scrollCardIntoView(card, row) {
+            var viewport = row[0];
+            var element = card[0];
+
+            if (!viewport || !element || !element.getBoundingClientRect) return;
+
+            var viewportBox = viewport.getBoundingClientRect();
+            var cardBox = element.getBoundingClientRect();
+
+            if (cardBox.left < viewportBox.left) {
+                viewport.scrollLeft -= viewportBox.left - cardBox.left;
+            } else if (cardBox.right > viewportBox.right) {
+                viewport.scrollLeft += cardBox.right - viewportBox.right;
+            }
+        }
+
+        function openTmdbItem(item, type) {
+            var title = item.title || item.name || 'Без названия';
+            var card = {};
+
+            Object.keys(item).forEach(function (key) {
+                card[key] = item[key];
             });
 
+            card.title = title;
+            card.original_title = item.original_title || item.original_name || title;
+            card.type = type;
+            card.media_type = type;
+            card.source = 'tmdb';
+
+            Lampa.Activity.push({
+                url: '',
+                title: title,
+                component: 'full',
+                source: 'tmdb',
+                method: type,
+                id: item.id,
+                card: card
+            });
+        }
+
+        function makeReleaseCard(item, shelf, row) {
+            var title = item.title || item.name || 'Без названия';
+            var date = item.release_date || item.first_air_date || '';
+            var year = date ? date.slice(0, 4) : '';
+            var rating = Number(item.vote_average || 0);
+            var meta = [year, rating ? '★ ' + rating.toFixed(1) : '']
+                .filter(Boolean)
+                .join(' · ');
+            var card = $('<div class="russian-release-card selector"></div>');
+            var poster = item.poster_path
+                ? $('<img class="russian-release-card__poster" alt="">')
+                : $('<div class="russian-release-card__poster"></div>');
+
+            if (item.poster_path) {
+                var posterUrl = Lampa.TMDB && Lampa.TMDB.image
+                    ? Lampa.TMDB.image('t/p/w342' + item.poster_path)
+                    : 'https://image.tmdb.org/t/p/w342' + item.poster_path;
+
+                poster.attr('src', posterUrl);
+                poster.attr('alt', title);
+            }
+
+            card.append(poster);
+            card.append($('<div class="russian-release-card__title"></div>').text(title));
+            if (meta) {
+                card.append($('<div class="russian-release-card__meta"></div>').text(meta));
+            }
+
+            card.on('hover:focus', function () {
+                scrollCardIntoView(card, row);
+            });
+
+            card.on('hover:enter', function () {
+                openTmdbItem(item, shelf.type);
+            });
+
+            return card;
+        }
+
+        function makeMoreCard(shelf, row) {
+            var card = $('<div class="russian-release-card russian-release-card--message selector"></div>');
+            card.text('Все результаты');
+
+            card.on('hover:focus', function () {
+                scrollCardIntoView(card, row);
+            });
+            card.on('hover:enter', shelf.action);
+
+            return card;
+        }
+
+        function renderShelf(shelf) {
+            var section = $('<div class="russian-shelf"></div>');
+            var row = $('<div class="russian-shelf__items"></div>');
+
+            section.append(
+                $('<div class="russian-shelf__title"></div>').text(shelf.title)
+            );
+            section.append(row);
+            list.append(section);
+            row.append(makeMessageCard('Загружаем…'));
+
+            shelf.row = row;
+            return section;
+        }
+
+        function loadShelf(shelf) {
+            if (!Lampa.TMDB || !Lampa.TMDB.api || !Lampa.TMDB.key) {
+                shelf.row.empty().append(makeMessageCard('Источник TMDB недоступен'));
+                return;
+            }
+
+            var request = new Lampa.Reguest();
+            requests.push(request);
+
+            var language = Lampa.Storage && Lampa.Storage.field
+                ? Lampa.Storage.field('tmdb_lang') || 'ru-RU'
+                : 'ru-RU';
+            var url = Lampa.TMDB.api(russianCatalogUrl(shelf.kind));
+            var separator = url.indexOf('?') >= 0 ? '&' : '?';
+            url += separator + 'api_key=' + encodeURIComponent(Lampa.TMDB.key());
+            url += '&language=' + encodeURIComponent(language);
+            url += '&page=1';
+
+            function renderResults(data) {
+                if (typeof data === 'string') {
+                    try {
+                        data = JSON.parse(data);
+                    } catch (error) {
+                        data = {};
+                    }
+                }
+
+                var results = data && Array.isArray(data.results)
+                    ? data.results.filter(function (item) {
+                        return item && item.id;
+                    })
+                    : [];
+                var hadFocus = shelf.row.find('.focus').length > 0;
+
+                shelf.row.empty();
+
+                if (!results.length) {
+                    shelf.row.append(makeMessageCard('Нет карточек для показа'));
+                } else {
+                    results.forEach(function (item) {
+                        shelf.row.append(makeReleaseCard(item, shelf, shelf.row));
+                    });
+                    shelf.row.append(makeMoreCard(shelf, shelf.row));
+                }
+
+                syncNavigation(shelf.row, hadFocus);
+            }
+
+            request.timeout(15000);
+            request.silent(
+                url,
+                renderResults,
+                function () {
+                    var hadFocus = shelf.row.find('.focus').length > 0;
+                    shelf.row.empty().append(
+                        makeMessageCard('Не удалось загрузить подборку TMDB')
+                    );
+                    syncNavigation(shelf.row, hadFocus);
+                }
+            );
+        }
+
+        function renderActions() {
+            var section = $('<div class="russian-shelf"></div>');
+            var row = $('<div class="russian-shelf__items"></div>');
+            var actions = [
+                { icon: '🔥', title: 'Сейчас в онлайн-кинотеатрах', action: openOnlineNow },
+                { icon: '🏴', title: 'Мои торренты', action: openMyTorrents },
+                { icon: '⚙️', title: 'Настроить TorrServer', action: configureTorrentServer }
+            ];
+
+            section.append(
+                $('<div class="russian-shelf__title"></div>').text('Дополнительно')
+            );
+
+            actions.forEach(function (item) {
+                var card = $('<div class="russian-action-card selector"></div>');
+                card.append($('<div class="russian-action-card__icon"></div>').text(item.icon));
+                card.append($('<div class="russian-action-card__title"></div>').text(item.title));
+                card.on('hover:enter', item.action);
+                card.on('hover:focus', function () {
+                    scrollCardIntoView(card, row);
+                });
+                row.append(card);
+            });
+
+            section.append(row);
+            list.append(section);
+        }
+
+        this.create = function () {
+            shelves.forEach(renderShelf);
+            renderActions();
             scroll.append(html);
+            shelves.forEach(loadShelf);
+            return this.render();
         };
 
         this.start = function () {
@@ -760,6 +1056,9 @@ function playTorrentFile(server, torrent, file, position, item) {
         };
 
         this.destroy = function () {
+            requests.forEach(function (request) {
+                request.clear();
+            });
             scroll.destroy();
             html.remove();
         };
