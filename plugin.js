@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.6.2';
+    var VERSION = '1.6.3';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -83,6 +83,18 @@
 
             '.russian-catalog-section {' +
             'padding:1.5em;' +
+            '}' +
+
+            '.russian-catalog-scroll {' +
+            'box-sizing:border-box;' +
+            'height:76vh;' +
+            'overflow-x:hidden;' +
+            'overflow-y:auto;' +
+            'scrollbar-width:none;' +
+            '}' +
+
+            '.russian-catalog-scroll::-webkit-scrollbar {' +
+            'display:none;' +
             '}' +
 
             '.russian-catalog-section__title {' +
@@ -734,13 +746,8 @@ function playTorrentFile(server, torrent, file, position, item) {
     function RussianSectionsComponent(object) {
         var requests = [];
 
-        var scroll = new Lampa.Scroll({
-            mask: true,
-            over: true
-        });
-
         var html = $(
-            '<div class="russian-catalog-section">' +
+            '<div class="russian-catalog-section russian-catalog-scroll">' +
                 '<div class="russian-catalog-section__title">' +
                     'Русский раздел' +
                 '</div>' +
@@ -795,20 +802,18 @@ function playTorrentFile(server, torrent, file, position, item) {
         function syncNavigation(row, restoreFocus) {
             if (!isActivePage()) return;
 
-            var rendered = scroll.render();
-            Lampa.Controller.collectionSet(rendered);
+            Lampa.Controller.collectionSet(html);
 
             if (restoreFocus) {
                 var first = row.find('.selector').first();
-                if (first.length) Lampa.Controller.collectionFocus(first, rendered);
+                if (first.length) Lampa.Controller.collectionFocus(first, html);
             }
         }
 
         function focusCard(card) {
             if (!card || !card.length) return false;
 
-            Lampa.Controller.collectionFocus(card, scroll.render());
-            scroll.update(card, true);
+            Lampa.Controller.collectionFocus(card, html);
             scrollCardIntoView(card, card.closest('.russian-shelf__items'));
 
             return true;
@@ -852,18 +857,31 @@ function playTorrentFile(server, torrent, file, position, item) {
         }
 
         function scrollCardIntoView(card, row) {
-            var viewport = row[0];
+            var viewport = html[0];
             var element = card[0];
 
             if (!viewport || !element || !element.getBoundingClientRect) return;
 
             var viewportBox = viewport.getBoundingClientRect();
             var cardBox = element.getBoundingClientRect();
+            var verticalMargin = Math.min(100, viewport.clientHeight * 0.12);
 
-            if (cardBox.left < viewportBox.left) {
-                viewport.scrollLeft -= viewportBox.left - cardBox.left;
-            } else if (cardBox.right > viewportBox.right) {
-                viewport.scrollLeft += cardBox.right - viewportBox.right;
+            if (cardBox.top < viewportBox.top + verticalMargin) {
+                viewport.scrollTop -= viewportBox.top + verticalMargin - cardBox.top;
+            } else if (cardBox.bottom > viewportBox.bottom - verticalMargin) {
+                viewport.scrollTop += cardBox.bottom - (viewportBox.bottom - verticalMargin);
+            }
+
+            var horizontalViewport = row && row[0];
+
+            if (horizontalViewport) {
+                var horizontalBox = horizontalViewport.getBoundingClientRect();
+
+                if (cardBox.left < horizontalBox.left) {
+                    horizontalViewport.scrollLeft -= horizontalBox.left - cardBox.left;
+                } else if (cardBox.right > horizontalBox.right) {
+                    horizontalViewport.scrollLeft += cardBox.right - horizontalBox.right;
+                }
             }
         }
 
@@ -921,7 +939,6 @@ function playTorrentFile(server, torrent, file, position, item) {
             }
 
             card.on('hover:focus', function () {
-                scroll.update(card, true);
                 scrollCardIntoView(card, row);
             });
 
@@ -937,7 +954,6 @@ function playTorrentFile(server, torrent, file, position, item) {
             card.text('Все результаты');
 
             card.on('hover:focus', function () {
-                scroll.update(card, true);
                 scrollCardIntoView(card, row);
             });
             card.on('hover:enter', shelf.action);
@@ -1041,7 +1057,6 @@ function playTorrentFile(server, torrent, file, position, item) {
                 card.append($('<div class="russian-action-card__title"></div>').text(item.title));
                 card.on('hover:enter', item.action);
                 card.on('hover:focus', function () {
-                    scroll.update(card, true);
                     scrollCardIntoView(card, row);
                 });
                 row.append(card);
@@ -1054,7 +1069,6 @@ function playTorrentFile(server, torrent, file, position, item) {
         this.create = function () {
             shelves.forEach(renderShelf);
             renderActions();
-            scroll.append(html);
             shelves.forEach(loadShelf);
             return this.render();
         };
@@ -1062,11 +1076,10 @@ function playTorrentFile(server, torrent, file, position, item) {
         this.start = function () {
             Lampa.Controller.add('content', {
                 toggle: function () {
-                    var rendered = scroll.render();
-                    var selectors = rendered.find('.selector');
+                    var selectors = html.find('.selector');
 
-                    Lampa.Controller.collectionSet(rendered);
-                    Lampa.Controller.collectionFocus(selectors.first(), rendered);
+                    Lampa.Controller.collectionSet(html);
+                    Lampa.Controller.collectionFocus(selectors.first(), html);
                 },
 
                 up: function () {
@@ -1098,14 +1111,13 @@ function playTorrentFile(server, torrent, file, position, item) {
         this.stop = function () {};
 
         this.render = function () {
-            return scroll.render();
+            return html;
         };
 
         this.destroy = function () {
             requests.forEach(function (request) {
                 request.clear();
             });
-            scroll.destroy();
             html.remove();
         };
     }
