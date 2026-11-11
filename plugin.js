@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.5.0';
+    var VERSION = '1.5.1';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -53,6 +53,17 @@
         } else {
             console.log('[Русское кино]', message);
         }
+    }
+
+    function navigate(direction) {
+        try {
+            if (typeof Navigator !== 'undefined' && Navigator.canmove(direction)) {
+                Navigator.move(direction);
+                return true;
+            }
+        } catch (error) {}
+
+        return false;
     }
 
     function addStyles() {
@@ -717,31 +728,19 @@ function playTorrentFile(server, torrent, file, position, item) {
                 },
 
                 up: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'up'
-                    );
+                    if (!navigate('up')) Lampa.Controller.toggle('head');
                 },
 
                 down: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'down'
-                    );
+                    navigate('down');
                 },
 
                 right: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'right'
-                    );
+                    navigate('right');
                 },
 
                 left: function () {
-                    Lampa.Controller.toggle('menu');
+                    if (!navigate('left')) Lampa.Controller.toggle('menu');
                 },
 
                 back: function () {
@@ -874,31 +873,19 @@ function playTorrentFile(server, torrent, file, position, item) {
                 },
 
                 up: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'up'
-                    );
+                    if (!navigate('up')) Lampa.Controller.toggle('head');
                 },
 
                 down: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'down'
-                    );
+                    navigate('down');
                 },
 
                 right: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'right'
-                    );
+                    navigate('right');
                 },
 
                 left: function () {
-                    Lampa.Controller.toggle('menu');
+                    if (!navigate('left')) Lampa.Controller.toggle('menu');
                 },
 
                 back: function () {
@@ -1048,31 +1035,19 @@ function playTorrentFile(server, torrent, file, position, item) {
                 },
 
                 up: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'up'
-                    );
+                    if (!navigate('up')) Lampa.Controller.toggle('head');
                 },
 
                 down: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'down'
-                    );
+                    navigate('down');
                 },
 
                 right: function () {
-                    Lampa.Controller.collectionFocus(
-                        false,
-                        scroll.render(),
-                        'right'
-                    );
+                    navigate('right');
                 },
 
                 left: function () {
-                    Lampa.Controller.toggle('menu');
+                    if (!navigate('left')) Lampa.Controller.toggle('menu');
                 },
 
                 back: function () {

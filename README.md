@@ -4,7 +4,7 @@
 
 ## Подключение
 
-1. Добавьте в Lampa URL плагина: `https://mnml38.github.io/lampa-russian/plugin.js?v=1.5.0`.
+1. Добавьте в Lampa URL плагина: `https://mnml38.github.io/lampa-russian/plugin.js?v=1.5.1`.
 2. Откройте меню **Русское кино** и выберите подборку. Результаты открываются в штатном каталоге TMDB Lampa.
 
 ## Подборки
