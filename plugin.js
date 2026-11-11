@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.5.1';
+    var VERSION = '1.5.2';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -51,7 +51,7 @@
         if (window.Lampa && Lampa.Noty) {
             Lampa.Noty.show(message);
         } else {
-            console.log('[Русское кино]', message);
+            console.log('[Русский раздел]', message);
         }
     }
 
@@ -165,7 +165,7 @@
     }
 
     function openSections() {
-        openActivity(SECTIONS_COMPONENT, 'Русское кино');
+        openActivity(SECTIONS_COMPONENT, 'Русский раздел');
     }
 
     function openOnlineNow() {
@@ -266,7 +266,7 @@
                 );
             }
         } catch (error) {
-            console.warn('[Русское кино] Не удалось прочитать адрес TorrServer', error);
+            console.warn('[Русский раздел] Не удалось прочитать адрес TorrServer', error);
         }
 
         return String(server || DEFAULT_TORRENT_SERVER).replace(/\/+$/, '');
@@ -285,7 +285,7 @@
                 );
             }
         } catch (error) {
-            console.warn('[Русское кино] Не удалось прочитать данные TorrServer', error);
+            console.warn('[Русский раздел] Не удалось прочитать данные TorrServer', error);
         }
 
         return credentials;
@@ -553,7 +553,7 @@
             });
         })
         .catch(function (error) {
-            console.error('[Русское кино]', error);
+            console.error('[Русский раздел]', error);
 
             Lampa.Noty.show(
                 'Ошибка: ' + error.message
@@ -615,7 +615,7 @@ function playTorrentFile(server, torrent, file, position, item) {
         encodeURIComponent(fileIndex) +
         '&play';
 
-    console.log('[Русское кино] Запуск серии');
+    console.log('[Русский раздел] Запуск серии');
 
     Lampa.Player.play({
         url: streamUrl,
@@ -643,7 +643,7 @@ function playTorrentFile(server, torrent, file, position, item) {
         var html = $(
             '<div class="russian-catalog-section">' +
                 '<div class="russian-catalog-section__title">' +
-                    'Русское кино' +
+                    'Русский раздел' +
                 '</div>' +
                 '<div class="russian-catalog-list"></div>' +
             '</div>'
@@ -1089,7 +1089,7 @@ function playTorrentFile(server, torrent, file, position, item) {
         var button = $(
             '<li class="menu__item selector russian-catalog-menu-item">' +
                 '<div class="menu__ico">🇷🇺</div>' +
-                '<div class="menu__text">Русское кино</div>' +
+                '<div class="menu__text">Русский раздел</div>' +
             '</li>'
         );
 
@@ -1151,7 +1151,7 @@ function playTorrentFile(server, torrent, file, position, item) {
         }
 
         console.log(
-            '[Русское кино] plugin.js запущен, версия ' + VERSION
+            '[Русский раздел] plugin.js запущен, версия ' + VERSION
         );
     }
 
