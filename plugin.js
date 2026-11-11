@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.6.1';
+    var VERSION = '1.6.2';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -804,6 +804,47 @@ function playTorrentFile(server, torrent, file, position, item) {
             }
         }
 
+        function focusCard(card) {
+            if (!card || !card.length) return false;
+
+            Lampa.Controller.collectionFocus(card, scroll.render());
+            scroll.update(card, true);
+            scrollCardIntoView(card, card.closest('.russian-shelf__items'));
+
+            return true;
+        }
+
+        function moveHorizontal(direction) {
+            var current = html.find('.focus').first();
+            var row = current.closest('.russian-shelf__items');
+            var cards = row.find('.selector');
+            var index = cards.index(current);
+            var next = cards.eq(index + (direction === 'right' ? 1 : -1));
+
+            if (focusCard(next)) return;
+            if (direction === 'left') Lampa.Controller.toggle('menu');
+        }
+
+        function moveVertical(direction) {
+            var current = html.find('.focus').first();
+            var currentShelf = current.closest('.russian-shelf');
+            var rows = list.children('.russian-shelf');
+            var index = rows.index(currentShelf);
+            var nextShelf = rows.eq(index + (direction === 'down' ? 1 : -1));
+
+            if (!nextShelf.length) {
+                if (direction === 'up') Lampa.Controller.toggle('head');
+                return;
+            }
+
+            var currentRowCards = current.closest('.russian-shelf__items').find('.selector');
+            var currentCardIndex = Math.max(0, currentRowCards.index(current));
+            var nextCards = nextShelf.find('.russian-shelf__items .selector');
+            var nextCard = nextCards.eq(Math.min(currentCardIndex, nextCards.length - 1));
+
+            focusCard(nextCard);
+        }
+
         function makeMessageCard(message) {
             var card = $('<div class="russian-release-card russian-release-card--message selector"></div>');
             card.text(message);
@@ -1029,19 +1070,19 @@ function playTorrentFile(server, torrent, file, position, item) {
                 },
 
                 up: function () {
-                    if (!navigate('up')) Lampa.Controller.toggle('head');
+                    moveVertical('up');
                 },
 
                 down: function () {
-                    navigate('down');
+                    moveVertical('down');
                 },
 
                 right: function () {
-                    navigate('right');
+                    moveHorizontal('right');
                 },
 
                 left: function () {
-                    if (!navigate('left')) Lampa.Controller.toggle('menu');
+                    moveHorizontal('left');
                 },
 
                 back: function () {
