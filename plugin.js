@@ -2,7 +2,7 @@
     'use strict';
 
     var PLUGIN_NAME = 'russian_catalog';
-    var VERSION = '1.6.0';
+    var VERSION = '1.6.1';
 
     var SECTIONS_COMPONENT = 'russian_sections';
     var ONLINE_COMPONENT = 'russian_online_top';
@@ -114,8 +114,8 @@
 
             '.russian-release-card {' +
             'position:relative;' +
-            'flex:0 0 8.5em;' +
-            'width:8.5em;' +
+            'flex:0 0 calc((100vw - 10em) / 6);' +
+            'width:calc((100vw - 10em) / 6);' +
             'min-width:0;' +
             'transition:transform .18s;' +
             '}' +
@@ -127,7 +127,7 @@
             '.russian-release-card__poster {' +
             'display:block;' +
             'width:100%;' +
-            'height:12.4em;' +
+            'height:calc((100vw - 10em) / 4);' +
             'object-fit:cover;' +
             'border-radius:.45em;' +
             'background:rgba(255,255,255,.1);' +
@@ -156,7 +156,7 @@
             'display:flex;' +
             'align-items:center;' +
             'justify-content:center;' +
-            'height:12.4em;' +
+            'height:calc((100vw - 10em) / 4);' +
             'padding:0 .75em;' +
             'border-radius:.45em;' +
             'background:rgba(255,255,255,.08);' +
@@ -165,6 +165,8 @@
             '}' +
 
             '.russian-action-card {' +
+            'box-sizing:border-box;' +
+            'max-width:calc((100vw - 10em) / 3);' +
             'display:flex;' +
             'align-items:center;' +
             'gap:.7em;' +
@@ -878,6 +880,7 @@ function playTorrentFile(server, torrent, file, position, item) {
             }
 
             card.on('hover:focus', function () {
+                scroll.update(card, true);
                 scrollCardIntoView(card, row);
             });
 
@@ -893,6 +896,7 @@ function playTorrentFile(server, torrent, file, position, item) {
             card.text('Все результаты');
 
             card.on('hover:focus', function () {
+                scroll.update(card, true);
                 scrollCardIntoView(card, row);
             });
             card.on('hover:enter', shelf.action);
@@ -996,6 +1000,7 @@ function playTorrentFile(server, torrent, file, position, item) {
                 card.append($('<div class="russian-action-card__title"></div>').text(item.title));
                 card.on('hover:enter', item.action);
                 card.on('hover:focus', function () {
+                    scroll.update(card, true);
                     scrollCardIntoView(card, row);
                 });
                 row.append(card);
